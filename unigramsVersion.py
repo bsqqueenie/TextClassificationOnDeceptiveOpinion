@@ -2,14 +2,18 @@ import os
 import pandas as pd
 import numpy as np
 import string
+import nltk
 from nltk.corpus import stopwords
+from nltk.stem.snowball import SnowballStemmer
 from stop_words import get_stop_words
 from sklearn.naive_bayes import MultinomialNB
+from scipy import stats
 from sklearn.metrics import confusion_matrix
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import tree
 from string import digits
+from sklearn.model_selection import cross_val_score
 
 
 #-------------1=True 0=False-----------------#
@@ -24,9 +28,13 @@ def removeNumbers(text):
 
 def sentenceProcessing(sentence):
     tempList = []
-    stop_words = list(get_stop_words('en'))  # About 900 stopwords
-    nltk_words = list(stopwords.words('english'))  # About 150 stopwords
-    stop_words.extend(nltk_words)
+    tempList2 = []
+    stemmer = SnowballStemmer("english")
+    #nltk.download("stopwords")
+    stop_words=list(stopwords.words('english'))
+    # stop_words = list(get_stop_words('en'))  # About 900 stopwords
+    # nltk_words = list(stopwords.words('english'))  # About 150 stopwords
+    # stop_words.extend(nltk_words)
     stop_words.append("th")
     sentence=removeNumbers(sentence)
     for i in string.punctuation:
@@ -35,8 +43,12 @@ def sentenceProcessing(sentence):
     for eachWord in lowerCase:
         if eachWord not in stop_words:
             tempList.append(eachWord)
-    # print(tempList)
-    return tempList
+    for eachOne in tempList:
+        afterStemmed=stemmer.stem(eachOne)
+        if afterStemmed not in tempList2:
+            tempList2.append(afterStemmed)
+    # print(tempList2)
+    return tempList2
 
 
 def getTheData(path):
@@ -129,9 +141,10 @@ def dataFrame2array(nameOfColumn, nameofDataFrame):
 trainingData, testData = getTheData(pathOfNegativeReviews)
 # print(trainingData,testData)
 # print(trainingData)
-totallFeatures=6959
-numOfFeatures = 500 # 选出前N个作为特征值
+totallFeatures=4992
+numOfFeatures = 800 # 选出前N个作为特征值
 bagOfWords = wordOfBag(trainingData, numOfFeatures)
+
 #print(bagOfWords)
 vectorDataofTraining = word2Vector(trainingData, bagOfWords)
 vectorDataofTest = word2Vector(testData, bagOfWords)
@@ -145,7 +158,15 @@ Y_test = np.array(vectorDataofTest["labelList"])
 
 # print(Y_test)
 # print("---------------------")
-clf = MultinomialNB()
+
+
+clf = MultinomialNB(fit_prior=True)
+
+#cross-validation
+
+# scores=cross_val_score(clf, X_train, Y_train, cv=10)
+# print("mean:",np.mean(scores),'se:',stats.sem(scores))
+
 clf.fit(X_train, Y_train)
 Y_prediction=clf.predict(X_test)
 # print(Y_prediction)
@@ -160,7 +181,15 @@ print(tn, fp, fn, tp,"precision:",precision,"recall:",recall,"accuracy:",accurac
 print("---------------------")
 
 # --------Regularized logistic regression------------#
-clf =  LogisticRegression(random_state=0, solver='lbfgs',multi_class='multinomial').fit(X_train, Y_train)
+
+clf =  LogisticRegression(random_state=0, solver='lbfgs',multi_class='multinomial')
+
+#cross-validation
+scores=cross_val_score(clf, X_train, Y_train, cv=10)
+print("mean:",np.mean(scores),'se:',stats.sem(scores))
+
+
+clf.fit(X_train, Y_train)
 Y_prediction=clf.predict(X_test)
 # print(Y_prediction)
 # confusion matrix
@@ -175,7 +204,10 @@ print("---------------------")
 
 # --------Classification trees------------ #
 
-clf = tree.DecisionTreeClassifier()
+clf = tree.DecisionTreeClassifier(max_depth=7)
+scores=cross_val_score(clf, X_train, Y_train, cv=10)
+print("mean:",np.mean(scores),'se:',stats.sem(scores))
+
 clf = clf.fit(X_train, Y_train)
 Y_prediction=clf.predict(X_test)
 # print(Y_prediction)
@@ -188,6 +220,8 @@ F1_score = 2 * (precision * recall) / (precision + recall)
 print("Classification trees prediction(unigram)")
 print(tn, fp, fn, tp,"precision:",precision,"recall:",recall,"accuracy:",accuracy,"F1_score:",F1_score)
 print("---------------------")
+
+
 
 # --------Random Forest------------ #
 n_estimators=100 # the number of trees
