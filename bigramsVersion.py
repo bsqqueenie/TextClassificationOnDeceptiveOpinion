@@ -11,6 +11,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import tree
 from string import digits
+from sklearn.model_selection import cross_val_score
+from scipy import stats
 
 def bigram(sentence):
     nltk_tokens = nltk.word_tokenize(sentence)
@@ -24,19 +26,10 @@ def bigram(sentence):
 pathOfNegativeReviews = 'op_spam_v1.4/negative_polarity'
 
 def sentenceProcessing(sentence):
-    tempList = []
-    stop_words = list(get_stop_words('en'))  # About 900 stopwords
-    nltk_words = list(stopwords.words('english'))  # About 150 stopwords
-    stop_words.extend(nltk_words)
-    stop_words.append("th")
     for i in string.punctuation:
         sentence = sentence.replace(i, '')
-    lowerCase = sentence.lower().split()
-    for eachWord in lowerCase:
-        if eachWord not in stop_words:
-            tempList.append(eachWord)
-    sentenceWithoutStopWords = ' '.join(tempList)
-    bigramSentence = bigram(sentenceWithoutStopWords)
+    lowerCase = sentence.lower()
+    bigramSentence = bigram(lowerCase)
     return bigramSentence
 
 
@@ -124,10 +117,21 @@ def dataFrame2array(nameOfColumn, nameofDataFrame):
 
     return finalArray
 
+
+def shrinkTheDic(dicName):
+    tempDic={}
+    for i in dicName:
+        if dicName[i]!=1 and dicName[i]!=2:
+            tempDic[i]=dicName[i]
+    return tempDic
+
 trainingData,testData=getTheData(pathOfNegativeReviews)
-#totallFeatures=43023
-numOfFeatures = 1000 # 选出前N个作为特征值
+
+totallFeatures=48397
+numOfFeatures = totallFeatures # 选出前N个作为特征值
 bagOfWords = wordOfBag(trainingData, numOfFeatures)
+bagOfWords = shrinkTheDic(bagOfWords)  # 去掉词频为1和2的属性
+
 print(bagOfWords)
 vectorDataofTraining = word2Vector(trainingData, bagOfWords)
 vectorDataofTest = word2Vector(testData, bagOfWords)
@@ -141,6 +145,10 @@ Y_test = np.array(vectorDataofTest["labelList"])
 # print(Y_test)
 # print("---------------------")
 clf = MultinomialNB()
+
+scores=cross_val_score(clf, X_train, Y_train, cv=5)
+print("mean:",np.mean(scores),'se:',stats.sem(scores))
+
 clf.fit(X_train, Y_train)
 Y_prediction=clf.predict(X_test)
 # print(Y_prediction)
@@ -155,7 +163,12 @@ print(tn, fp, fn, tp,"precision:",precision,"recall:",recall,"accuracy:",accurac
 print("---------------------")
 
 # --------Regularized logistic regression------------#
-clf =  LogisticRegression(random_state=0, solver='lbfgs',multi_class='multinomial').fit(X_train, Y_train)
+clf =  LogisticRegression(random_state=0, solver='lbfgs',multi_class='multinomial')
+
+scores=cross_val_score(clf, X_train, Y_train, cv=5)
+print("mean:",np.mean(scores),'se:',stats.sem(scores))
+
+clf.fit(X_train, Y_train)
 Y_prediction=clf.predict(X_test)
 # print(Y_prediction)
 # confusion matrix
